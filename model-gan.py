@@ -1,3 +1,10 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Sat Apr 20 22:46:42 2019
+
+@author: nizhe
+"""
+
 import numpy as np
 import os
 
@@ -5,7 +12,7 @@ import datetime
 import matplotlib.pyplot as plt
 
 from utils import *
-from WAE import *
+from GAN import *
 from scipy import sparse
 
 import tensorflow as tf
@@ -26,11 +33,10 @@ batch_size_vad = 500
 N_vad = vad_data_tr.shape[0]
 idxlist_vad = list(range(N_vad))
 
-p_dims = [200, 600, n_items]
 
 tf.reset_default_graph()
-wae = WAE(p_dims, random_seed = 12345)
-saver, logits_var, loss_var, train_op_var, merged_var = wae.build_graph()
+gan = GAN(real_size = 128, fake_size = 128, g_units = 128, d_units = 128, alpha = 0.01, lr = 1e-3, smooth = 0.1)
+d_train_opt, g_train_opt, merged, saver = gan.build_graph()
 
 ndcg_var = tf.Variable(0.0)
 ndcg_dist_var = tf.placeholder(dtype = tf.float64, shape = None)
@@ -93,7 +99,7 @@ with tf.Session() as sess:
 
             if bnum % 100 == 0:
                 try:
-                    summary_train = sess.run(merged_var, feed_dict = feed_dict)
+                    summary_train = sess.run(merged, feed_dict = feed_dict)
                     summary_writer.add_summary(summary_train, global_step = epoch * batches_per_epoch + bnum) 
                 except tf.errors.InvalidArgumentError:
                     pass

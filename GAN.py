@@ -9,18 +9,20 @@ import tensorflow as tf
 
 class GAN(object):
     
-    def __init__(self, g_units, d_units, alpha, lr, smooth):
+    def __init__(self, real_size, fake_size, g_units, d_units, alpha, lr, smooth):
         
+        self.real_size = real_size
+        self.fake_size = fake_size
         self.g_units = g_units
         self.d_units = d_units
         self.alpha = alpha
         self.lr = lr
         self.smooth = smooth
         
-    def get_inputs(real_size, fake_size):
+    def get_inputs(self):
     
-        real = tf.placeholder(tf.float32, [None, real_size], name='real_matrix')
-        fake = tf.placeholder(tf.float32, [None, fake_size], name='fake_matrix')
+        real = tf.placeholder(tf.float32, [None, self.real_size], name='real_matrix')
+        fake = tf.placeholder(tf.float32, [None, self.fake_size], name='fake_matrix')
         
         return real, fake   
         
@@ -48,8 +50,8 @@ class GAN(object):
     
     def build_graph(self):
         
-        real, fake = self.get_inputs(img_size, noise_size)
-        g_logits, g_outputs = self.get_generator(fake, g_units, img_size)
+        real, fake = self.get_inputs(self.real_size, self.fake_size)
+        g_logits, g_outputs = self.get_generator(fake, self.g_units, self.real_size)
         d_logits_real, d_outputs_real = self.get_discriminator(real, self.d_units)
         d_logits_fake, d_outputs_fake = self.get_discriminator(g_outputs, self.d_units)
         d_loss_real = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(\
@@ -62,9 +64,9 @@ class GAN(object):
         
         g_loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(\
                     logits = d_logits_fake, labels = tf.ones_like(d_logits_fake)) * (1 - self.smooth))
+
         
         train_vars = tf.trainable_variables()
-        
         
         g_vars = [var for var in train_vars if var.name.startswith("generator")]
         d_vars = [var for var in train_vars if var.name.startswith("discriminator")]
@@ -73,4 +75,10 @@ class GAN(object):
         d_train_opt = tf.train.AdamOptimizer(self.lr).minimize(d_loss, var_list = d_vars)
         g_train_opt = tf.train.AdamOptimizer(self.lr).minimize(g_loss, var_list = g_vars)
         
-        return d_train_opt, g_train_opt
+        saver = tf.train.Saver(var_list = g_vars)
+        
+        tf.summary.scalar('d_loss', d_loss)
+        tf.summary.scalar('g_loss', g_loss)
+        merged = tf.summary.merge_all()
+        
+        return d_train_opt, g_train_opt, merged, saver
