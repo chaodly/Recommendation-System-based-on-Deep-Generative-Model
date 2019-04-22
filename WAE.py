@@ -8,7 +8,7 @@ import tensorflow as tf
 
 class WAE(object):
     
-    def __init__(self, p_dims, lr = 0.001, random_seed = None):
+    def __init__(self, p_dims, lr = 0.01, random_seed = None):
         
         self.p_dims = p_dims
         self.q_dims = p_dims[::-1]
@@ -30,8 +30,14 @@ class WAE(object):
         for i, (w, b) in enumerate(zip(self.weights_q, self.biases_q)):
             h = tf.matmul(h, w) + b
             if i != len(self.weights_q) - 1:
-                h = tf.nn.relu(h)
-        return h
+                h = tf.nn.tanh(h)
+            else:
+                mu_q = h[:, :self.q_dims[-1]]
+                logvar_q = h[:, self.q_dims[-1]:]
+                std_q = tf.exp(0.5 * logvar_q)
+                KL = tf.reduce_mean(tf.reduce_sum(0.5 * (-logvar_q + tf.exp(logvar_q) + mu_q ** 2 - 1), axis = 1))
+        
+        return h, mu_q, std_q, KL
 
     def decoder(self, z):
         
@@ -39,7 +45,7 @@ class WAE(object):
         for i, (w, b) in enumerate(zip(self.weights_p, self.biases_p)):
             h = tf.matmul(h, w) + b
             if i != len(self.weights_p) - 1:
-                h = tf.nn.relu(h)
+                h = tf.nn.tanh(h)
         return h
     
 
@@ -47,6 +53,8 @@ class WAE(object):
         
         self.weights_q, self.biases_q = [], []
         for i, (d_in, d_out) in enumerate(zip(self.q_dims[:-1], self.q_dims[1:])):
+            if i == len(self.q_dims[:-1]) - 1:
+                d_out *= 2
             weight_key = "weight_q_{}to{}".format(i, i+1)
             bias_key = "bias_q_{}".format(i+1)
             self.weights_q.append(tf.get_variable(name = weight_key, shape = [d_in, d_out],
@@ -91,7 +99,7 @@ class WAE(object):
         
         stats = 0.0
         
-        for scale in [.1, .2, .5, 1., 2., 5., 10.]:
+        for scale in [.1, .2, .5, 1., 2., 5.]:
             C = 2 * self.p_dims[0] * scale
             res = C / (C + dists_x) + C / (C + dists_y)
             res1 = (1 - tf.eye(self.batch_size)) * res
@@ -105,17 +113,23 @@ class WAE(object):
     def build_graph(self):
         
         self.construct_weights()
-        z_real = self.encoder()
+        z_real, mu_q, std_q, KL = self.encoder()
         z_fake = tf.random_normal(shape = [self.batch_size, 200], mean = 0.0, stddev = 1.0)
         logits = self.decoder(z_fake)
         
+        log_softmax_var = tf.nn.log_softmax(logits)
+        
         saver = tf.train.Saver()
+
+        neg_ll = -tf.reduce_mean(tf.reduce_sum(log_softmax_var * self.input_ph, axis = -1))
         
         mmd_loss = self.mmd_loss(z_real, z_fake)
+        
         reg = tf.contrib.layers.l2_regularizer(0.01)
         reg_var = tf.contrib.layers.apply_regularization(reg, self.weights_q + self.weights_p)
-        total_loss = tf.reduce_mean(tf.squared_difference(self.input_ph, tf.nn.log_softmax(logits))) + mmd_loss + 2 * reg_var
-#        total_loss = mmd_loss + tf.reduce_mean(tf.reduce_sum(tf.nn.log_softmax(logits) * self.input_ph, axis = -1))
+        
+        total_loss = neg_ll +  0.3 * KL - mmd_loss + 2 * reg_var
+        
         train_op = tf.train.AdamOptimizer(self.lr).minimize(total_loss)
 
         tf.summary.scalar('mmd_loss', mmd_loss)

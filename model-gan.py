@@ -19,7 +19,7 @@ import tensorflow as tf
 
 os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 
-data_dir = 'ml-20m\\data'
+data_dir = 'C:\\Users\\nizhe\\Desktop\\python code\\ml-20m\\data'
 unique_sid, n_items, train_data, vad_data_tr, vad_data_te = load_data(data_dir)
 
 
@@ -35,7 +35,7 @@ idxlist_vad = list(range(N_vad))
 
 
 tf.reset_default_graph()
-gan = GAN(real_size = 128, fake_size = 128, g_units = 128, d_units = 128, alpha = 0.01, lr = 1e-3, smooth = 0.1)
+gan = GAN(real_size = train_data.shape[1], fake_size = train_data.shape[1], g_units = 128, d_units = 128, alpha = 0.01, lr = 1e-3, smooth = 0.1)
 d_train_opt, g_train_opt, merged, saver = gan.build_graph()
 
 ndcg_var = tf.Variable(0.0)
@@ -53,16 +53,16 @@ merged_valid = tf.summary.merge([ndcg_summary, ndcg_dist_summary, recall_summary
 # In[ ]:
 
 
-arch_str = "I-%s-I" % ('-'.join([str(d) for d in wae.dims[1:-1]]))
+arch_str = "I-%s-I" % ('-'.join([str(gan.g_units), str(gan.d_units)]))
 
-log_dir = '\\log\\ml-20m\\wae\\{}'.format(arch_str) + str(datetime.datetime.today()).replace(':', '-').replace('.', '-')
+log_dir = '\\log\\ml-20m\\gan\\{}'.format(arch_str) + str(datetime.datetime.today()).replace(':', '-').replace('.', '-')
 if not os.path.isdir(log_dir):
     os.makedirs(log_dir)
 print("log directory: %s" % log_dir)
 
 summary_writer = tf.summary.FileWriter(log_dir, graph = tf.get_default_graph())
 
-ckpt_dir = '\\chkpt\\ml-20m\\wae\\{}'.format(arch_str) + str(datetime.datetime.today()).replace(':', '-').replace('.', '-')
+ckpt_dir = '\\chkpt\\ml-20m\\gan\\{}'.format(arch_str) + str(datetime.datetime.today()).replace(':', '-').replace('.', '-')
 if not os.path.isdir(ckpt_dir):
     os.makedirs(ckpt_dir)    
 print("ckpt directory: %s" % ckpt_dir)
@@ -70,19 +70,21 @@ print("ckpt directory: %s" % ckpt_dir)
 
 ndcgs_vad = []
 recall_vad = []
+
 with tf.Session() as sess:
 
-    init = tf.global_variables_initializer()
-    sess.run(init)
+    sess.run(tf.global_variables_initializer())
     
     best_ndcg = -np.inf
     
     for epoch in range(n_epochs):
+        
         np.random.shuffle(idxlist)
         print (epoch)
-        # train for one epoch
         print ('begin training...')
+        
         for bnum, st_idx in enumerate(range(0, N, batch_size)):
+            
             end_idx = min(st_idx + batch_size, N)
             X = train_data[idxlist[st_idx : end_idx]]
             
@@ -90,12 +92,13 @@ with tf.Session() as sess:
                 X = X.toarray()
             X = X.astype('float32')           
             
-            feed_dict = {wae.input_ph: X, 
-                         wae.keep_prob_ph: 0.5, 
-                         wae.is_training_ph: 1,
-                         wae.batch_size : X.shape[0]} 
+            # generator的输入噪声
+            batch_noise = np.random.uniform(-1, 1, size = (batch_size, train_data.shape[1]))
             
-            sess.run(train_op_var, feed_dict = feed_dict)
+            # Run optimizers
+            feed_dict = {gan.real: X, gan.fake: batch_noise}
+            sess.run(d_train_opt, feed_dict = feed_dict)
+            sess.run(g_train_opt, feed_dict = {gan.fake: batch_noise})
 
             if bnum % 100 == 0:
                 try:
@@ -107,45 +110,45 @@ with tf.Session() as sess:
         
         print ('begin evaluating...')
         
-        # compute validation NDCG
-        ndcg_dist = []
-        recall_dist = []
-        
-        for bnum, st_idx in enumerate(range(0, N_vad, batch_size_vad)):
-            end_idx = min(st_idx + batch_size_vad, N_vad)
-            X = vad_data_tr[idxlist_vad[st_idx : end_idx]]
-
-            if sparse.isspmatrix(X):
-                X = X.toarray()
-            X = X.astype('float32')
-        
-            pred_val = sess.run(logits_var, feed_dict={wae.input_ph : X} )
-            print (pred_val.shape)
-            # exclude examples from training and validation (if any)
-            pred_val[X.nonzero()] = -np.inf
-            
-            ndcg_tmp, recall_tmp = get_NDCG_Recall(pred_val, vad_data_te[idxlist_vad[st_idx : end_idx]], k_ndcg = 100, k_rcall = 50)
-            
-            ndcg_dist.append(ndcg_tmp)
-            recall_dist.append(recall_tmp)
-        
-        ndcg_dist = np.concatenate(ndcg_dist)
-        ndcg_ = ndcg_dist.mean()
-        ndcgs_vad.append(ndcg_)
-        
-        recall_dist = np.concatenate(recall_dist)
-        recall_ = recall_dist.mean()
-        recall_vad.append(recall_)
-        
-        merged_valid_val = sess.run(merged_valid, feed_dict = {ndcg_var: ndcg_, ndcg_dist_var : ndcg_dist,
-                                                               recall_var: recall_, recall_dist_var : recall_dist})
-        summary_writer.add_summary(merged_valid_val, epoch)
-        print (recall_)
-        print (ndcg_)
-        # update the best model (if necessary)
-        if ndcg_ > best_ndcg:
-            saver.save(sess, '{}/model'.format(ckpt_dir))
-            best_ndcg = ndcg_
+#        # compute validation NDCG
+#        ndcg_dist = []
+#        recall_dist = []
+#        
+#        for bnum, st_idx in enumerate(range(0, N_vad, batch_size_vad)):
+#            end_idx = min(st_idx + batch_size_vad, N_vad)
+#            X = vad_data_tr[idxlist_vad[st_idx : end_idx]]
+#
+#            if sparse.isspmatrix(X):
+#                X = X.toarray()
+#            X = X.astype('float32')
+#        
+#            pred_val = sess.run(logits_var, feed_dict = feed_dict)
+#            print (pred_val.shape)
+#            # exclude examples from training and validation (if any)
+#            pred_val[X.nonzero()] = -np.inf
+#            
+#            ndcg_tmp, recall_tmp = get_NDCG_Recall(pred_val, vad_data_te[idxlist_vad[st_idx : end_idx]], k_ndcg = 100, k_rcall = 50)
+#            
+#            ndcg_dist.append(ndcg_tmp)
+#            recall_dist.append(recall_tmp)
+#        
+#        ndcg_dist = np.concatenate(ndcg_dist)
+#        ndcg_ = ndcg_dist.mean()
+#        ndcgs_vad.append(ndcg_)
+#        
+#        recall_dist = np.concatenate(recall_dist)
+#        recall_ = recall_dist.mean()
+#        recall_vad.append(recall_)
+#        
+#        merged_valid_val = sess.run(merged_valid, feed_dict = {ndcg_var: ndcg_, ndcg_dist_var : ndcg_dist,
+#                                                               recall_var: recall_, recall_dist_var : recall_dist})
+#        summary_writer.add_summary(merged_valid_val, epoch)
+#        print (recall_)
+#        print (ndcg_)
+#        # update the best model (if necessary)
+#        if ndcg_ > best_ndcg:
+#            saver.save(sess, '{}/model'.format(ckpt_dir))
+#            best_ndcg = ndcg_
 
 
 # In[ ]:

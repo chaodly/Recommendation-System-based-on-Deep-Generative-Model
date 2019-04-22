@@ -12,7 +12,7 @@ import tensorflow as tf
 
 os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 
-data_dir = 'ml-20m\\data'
+data_dir = 'C:\\Users\\nizhe\\Desktop\\python code\\ml-20m\\data'
 unique_sid, n_items, train_data, vad_data_tr, vad_data_te = load_data(data_dir)
 
 
@@ -66,8 +66,7 @@ ndcgs_vad = []
 recall_vad = []
 with tf.Session() as sess:
 
-    init = tf.global_variables_initializer()
-    sess.run(init)
+    sess.run(tf.global_variables_initializer())
     
     best_ndcg = -np.inf
     
@@ -114,7 +113,7 @@ with tf.Session() as sess:
             X = X.astype('float32')
         
             pred_val = sess.run(logits_var, feed_dict={wae.input_ph : X} )
-            print (pred_val.shape)
+            
             # exclude examples from training and validation (if any)
             pred_val[X.nonzero()] = -np.inf
             

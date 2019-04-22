@@ -50,10 +50,10 @@ class GAN(object):
     
     def build_graph(self):
         
-        real, fake = self.get_inputs(self.real_size, self.fake_size)
-        g_logits, g_outputs = self.get_generator(fake, self.g_units, self.real_size)
-        d_logits_real, d_outputs_real = self.get_discriminator(real, self.d_units)
-        d_logits_fake, d_outputs_fake = self.get_discriminator(g_outputs, self.d_units)
+        real, fake = self.get_inputs()
+        g_logits, g_outputs = self.generator(fake, self.real_size)
+        d_logits_real, d_outputs_real = self.discriminator(real)
+        d_logits_fake, d_outputs_fake = self.discriminator(g_outputs, reuse = True)
         d_loss_real = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(\
                         logits = d_logits_real, labels = tf.ones_like(d_logits_real)) * (1 - self.smooth))
         
