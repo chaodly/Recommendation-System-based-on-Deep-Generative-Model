@@ -12,8 +12,9 @@ import tensorflow as tf
 
 os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 
-data_dir = 'C:\\Users\\nizhe\\Desktop\\python code\\ml-20m\\data'
-unique_sid, n_items, train_data, vad_data_tr, vad_data_te = load_data(data_dir)
+mainPath = 'C:\\Users\\nizhe\\Desktop\\python code\\ml-20m'
+data_dir = '\\data'
+unique_sid, n_items, train_data, vad_data_tr, vad_data_te = load_data(mainPath + data_dir)
 
 
 N = train_data.shape[0]
@@ -25,6 +26,8 @@ batches_per_epoch = int(np.ceil(float(N) / batch_size))
 batch_size_vad = 500
 N_vad = vad_data_tr.shape[0]
 idxlist_vad = list(range(N_vad))
+total_anneal_steps = 200000
+anneal_cap = 0.2
 
 p_dims = [200, 600, n_items]
 
@@ -49,14 +52,14 @@ merged_valid = tf.summary.merge([ndcg_summary, ndcg_dist_summary, recall_summary
 
 arch_str = "I-%s-I" % ('-'.join([str(d) for d in wae.dims[1:-1]]))
 
-log_dir = '\\log\\ml-20m\\wae\\{}'.format(arch_str) + str(datetime.datetime.today()).replace(':', '-').replace('.', '-')
+log_dir = mainPath + '\\log\\ml-20m\\wae\\{}'.format(arch_str) + str(datetime.datetime.today()).replace(':', '-').replace('.', '-')
 if not os.path.isdir(log_dir):
     os.makedirs(log_dir)
 print("log directory: %s" % log_dir)
 
 summary_writer = tf.summary.FileWriter(log_dir, graph = tf.get_default_graph())
 
-ckpt_dir = '\\chkpt\\ml-20m\\wae\\{}'.format(arch_str) + str(datetime.datetime.today()).replace(':', '-').replace('.', '-')
+ckpt_dir = mainPath + '\\chkpt\\ml-20m\\wae\\{}'.format(arch_str) + str(datetime.datetime.today()).replace(':', '-').replace('.', '-')
 if not os.path.isdir(ckpt_dir):
     os.makedirs(ckpt_dir)    
 print("ckpt directory: %s" % ckpt_dir)
@@ -69,6 +72,8 @@ with tf.Session() as sess:
     sess.run(tf.global_variables_initializer())
     
     best_ndcg = -np.inf
+    
+    update_count = 0
     
     for epoch in range(n_epochs):
         np.random.shuffle(idxlist)
@@ -83,10 +88,12 @@ with tf.Session() as sess:
                 X = X.toarray()
             X = X.astype('float32')           
             
+            
             feed_dict = {wae.input_ph: X, 
                          wae.keep_prob_ph: 0.5, 
                          wae.is_training_ph: 1,
-                         wae.batch_size : X.shape[0]} 
+                         wae.batch_size : X.shape[0],
+                         wae.anneal_ph: min(anneal_cap, 1. * update_count / total_anneal_steps)} 
             
             sess.run(train_op_var, feed_dict = feed_dict)
 
@@ -97,7 +104,8 @@ with tf.Session() as sess:
                 except tf.errors.InvalidArgumentError:
                     pass
             
-        
+            update_count += 1
+            
         print ('begin evaluating...')
         
         # compute validation NDCG

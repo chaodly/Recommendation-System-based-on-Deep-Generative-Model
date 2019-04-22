@@ -8,7 +8,7 @@ import tensorflow as tf
 
 class WAE(object):
     
-    def __init__(self, p_dims, lr = 0.01, random_seed = None):
+    def __init__(self, p_dims, lr = 0.001, random_seed = None):
         
         self.p_dims = p_dims
         self.q_dims = p_dims[::-1]
@@ -23,6 +23,7 @@ class WAE(object):
         self.keep_prob_ph = tf.placeholder_with_default(1.0, shape = None)
         self.is_training_ph = tf.placeholder_with_default(0., shape = None)
         self.batch_size = tf.placeholder_with_default(500, shape = None)
+        self.anneal_ph = tf.placeholder_with_default(1., shape = None)
         
     def encoder(self):
         
@@ -99,7 +100,7 @@ class WAE(object):
         
         stats = 0.0
         
-        for scale in [.1, .2, .5, 1., 2., 5.]:
+        for scale in [.1, .2, .5, 1., 2., 5., 10.]:
             C = 2 * self.p_dims[0] * scale
             res = C / (C + dists_x) + C / (C + dists_y)
             res1 = (1 - tf.eye(self.batch_size)) * res
@@ -114,7 +115,7 @@ class WAE(object):
         
         self.construct_weights()
         z_real, mu_q, std_q, KL = self.encoder()
-        z_fake = tf.random_normal(shape = [self.batch_size, 200], mean = 0.0, stddev = 1.0)
+        z_fake = mu_q + tf.random_normal(tf.shape(std_q)) * std_q
         logits = self.decoder(z_fake)
         
         log_softmax_var = tf.nn.log_softmax(logits)
@@ -128,7 +129,7 @@ class WAE(object):
         reg = tf.contrib.layers.l2_regularizer(0.01)
         reg_var = tf.contrib.layers.apply_regularization(reg, self.weights_q + self.weights_p)
         
-        total_loss = neg_ll +  0.3 * KL - mmd_loss + 2 * reg_var
+        total_loss = neg_ll +  self.anneal_ph * KL - 0.5 * mmd_loss + 2 * reg_var
         
         train_op = tf.train.AdamOptimizer(self.lr).minimize(total_loss)
 
