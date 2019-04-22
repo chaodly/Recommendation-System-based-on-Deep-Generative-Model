@@ -151,9 +151,9 @@ with tf.Session() as sess:
 
 # In[ ]:
 
-
 plt.figure(figsize = (12, 3))
 plt.plot(ndcgs_vad)
 plt.ylabel("Validation NDCG@100")
 plt.xlabel("Epochs")
+
 
