@@ -42,7 +42,7 @@ def load_data(data_dir):
     return unique_sid, n_items, data, data_tr, data_te
 
 
-def get_NDCG_Recall(X_pred, heldout_batch, k_ndcg = 100, k_rcall = 100):
+def get_NDCG_Recall(X_pred, heldout_batch, k_ndcg, k_rcall):
     
     batch_users = X_pred.shape[0]
     idx = bn.argpartition(-X_pred, k_ndcg, axis = 1)
