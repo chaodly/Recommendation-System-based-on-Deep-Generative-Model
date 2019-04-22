@@ -8,7 +8,7 @@ import tensorflow as tf
 
 class WAE(object):
     
-    def __init__(self, p_dims, lr = 0.002, random_seed = None):
+    def __init__(self, p_dims, lr = 0.004, random_seed = None):
         
         self.p_dims = p_dims
         self.q_dims = p_dims[::-1]

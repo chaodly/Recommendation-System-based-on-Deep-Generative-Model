@@ -29,7 +29,7 @@ idxlist_vad = list(range(N_vad))
 total_anneal_steps = 200000
 anneal_cap = 0.2
 
-p_dims = [200, 600, n_items]
+p_dims = [300, 600, n_items]
 
 tf.reset_default_graph()
 wae = WAE(p_dims, random_seed = 12345)
@@ -90,8 +90,7 @@ with tf.Session() as sess:
             
             
             feed_dict = {wae.input_ph: X, 
-                         wae.keep_prob_ph: 0.5, 
-                         wae.is_training_ph: 1,
+                         wae.keep_prob_ph: 0.6, 
                          wae.batch_size : X.shape[0],
                          wae.anneal_ph: min(anneal_cap, 1. * update_count / total_anneal_steps)} 
             
