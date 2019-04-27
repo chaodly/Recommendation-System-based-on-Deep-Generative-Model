@@ -20,7 +20,7 @@ unique_sid, n_items, train_data, vad_data_tr, vad_data_te = load_data(mainPath +
 N = train_data.shape[0]
 idxlist = list(range(N))
 
-n_epochs = 20
+n_epochs = 60
 batch_size = 500
 batches_per_epoch = int(np.ceil(float(N) / batch_size))
 batch_size_vad = 500
@@ -67,6 +67,7 @@ print("ckpt directory: %s" % ckpt_dir)
 
 ndcgs_vad = []
 recall_vad = []
+
 with tf.Session() as sess:
 
     sess.run(tf.global_variables_initializer())
@@ -119,7 +120,7 @@ with tf.Session() as sess:
                 X = X.toarray()
             X = X.astype('float32')
         
-            pred_val = sess.run(logits_var, feed_dict={wae.input_ph : X} )
+            pred_val = sess.run(logits_var, feed_dict = {wae.input_ph : X} )
             
             # exclude examples from training and validation (if any)
             pred_val[X.nonzero()] = -np.inf
@@ -140,7 +141,9 @@ with tf.Session() as sess:
         merged_valid_val = sess.run(merged_valid, feed_dict = {ndcg_var: ndcg_, ndcg_dist_var : ndcg_dist,
                                                                recall_var: recall_, recall_dist_var : recall_dist})
         summary_writer.add_summary(merged_valid_val, epoch)
+        print ("recall...")
         print (recall_)
+        print ("ndcg...")
         print (ndcg_)
         # update the best model (if necessary)
         if ndcg_ > best_ndcg:
@@ -152,7 +155,8 @@ with tf.Session() as sess:
 
 plt.figure(figsize = (12, 3))
 plt.plot(ndcgs_vad)
-plt.ylabel("Validation NDCG@100")
 plt.xlabel("Epochs")
+plt.ylabel("Validation NDCG@100")
+
 
 

@@ -8,7 +8,7 @@ import tensorflow as tf
 
 class WAE(object):
     
-    def __init__(self, p_dims, lr = 0.004, random_seed = None):
+    def __init__(self, p_dims, lr = 0.001, random_seed = None):
         
         self.p_dims = p_dims
         self.q_dims = p_dims[::-1]
@@ -125,9 +125,6 @@ class WAE(object):
         neg_ll = -tf.reduce_mean(tf.reduce_sum(log_softmax_var * self.input_ph, axis = -1))
         
         mmd_loss = self.mmd_loss(z_real, z_fake)
-        
-        reg = tf.contrib.layers.l2_regularizer(0.01)
-        reg_var = tf.contrib.layers.apply_regularization(reg, self.weights_q + self.weights_p)
         
         total_loss = neg_ll - mmd_loss
         
