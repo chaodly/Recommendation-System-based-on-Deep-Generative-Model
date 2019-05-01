@@ -20,7 +20,7 @@ unique_sid, n_items, train_data, vad_data_tr, vad_data_te = load_data(mainPath +
 N = train_data.shape[0]
 idxlist = list(range(N))
 
-n_epochs = 60
+n_epochs = 20
 batch_size = 500
 batches_per_epoch = int(np.ceil(float(N) / batch_size))
 batch_size_vad = 500
@@ -155,6 +155,7 @@ with tf.Session() as sess:
 
 plt.figure(figsize = (12, 3))
 plt.plot(ndcgs_vad)
+plt.plot(recall_vad)
 plt.xlabel("Epochs")
 plt.ylabel("Validation NDCG@100")
 
